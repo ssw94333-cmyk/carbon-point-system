@@ -1,0 +1,160 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carbon.mapper.CarbonBehaviorRecordMapper">
+    
+    <resultMap id="BehaviorRecordVOMap" type="com.carbon.dto.BehaviorRecordVO">
+        <id column="id" property="id"/>
+        <result column="user_id" property="userId"/>
+        <result column="username" property="username"/>
+        <result column="nickname" property="nickname"/>
+        <result column="behavior_type" property="behaviorType"/>
+        <result column="behavior_name" property="behaviorName"/>
+        <result column="behavior_value" property="behaviorValue"/>
+        <result column="carbon_reduction" property="carbonReduction"/>
+        <result column="points" property="points"/>
+        <result column="description" property="description"/>
+        <result column="proof_image" property="proofImage"/>
+        <result column="audit_status" property="auditStatus"/>
+        <result column="audit_status_text" property="auditStatusText"/>
+        <result column="audit_user_id" property="auditUserId"/>
+        <result column="audit_username" property="auditUsername"/>
+        <result column="audit_time" property="auditTime"/>
+        <result column="audit_remark" property="auditRemark"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+    
+    <select id="selectRecordPage" resultMap="BehaviorRecordVOMap">
+        SELECT 
+            cbr.id,
+            cbr.user_id,
+            u.username,
+            u.nickname,
+            cbr.behavior_type,
+            cbr.behavior_name,
+            cbr.behavior_value,
+            cbr.carbon_reduction,
+            cbr.points,
+            cbr.description,
+            cbr.proof_image,
+            cbr.audit_status,
+            CASE cbr.audit_status
+                WHEN 0 THEN '待审核'
+                WHEN 1 THEN '审核通过'
+                WHEN 2 THEN '审核拒绝'
+            END AS audit_status_text,
+            cbr.audit_user_id,
+            au.username AS audit_username,
+            cbr.audit_time,
+            cbr.audit_remark,
+            cbr.create_time
+        FROM carbon_behavior_record cbr
+        LEFT JOIN user u ON cbr.user_id = u.id
+        LEFT JOIN user au ON cbr.audit_user_id = au.id
+        WHERE 1=1
+        <if test="userId != null">
+            AND cbr.user_id = #{userId}
+        </if>
+        <if test="behaviorType != null and behaviorType != ''">
+            AND cbr.behavior_type = #{behaviorType}
+        </if>
+        <if test="auditStatus != null">
+            AND cbr.audit_status = #{auditStatus}
+        </if>
+        <if test="startTime != null">
+            AND cbr.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND cbr.create_time &lt;= #{endTime}
+        </if>
+        ORDER BY cbr.create_time DESC
+    </select>
+    
+    <select id="selectRecordById" resultMap="BehaviorRecordVOMap">
+        SELECT 
+            cbr.id,
+            cbr.user_id,
+            u.username,
+            u.nickname,
+            cbr.behavior_type,
+            cbr.behavior_name,
+            cbr.behavior_value,
+            cbr.carbon_reduction,
+            cbr.points,
+            cbr.description,
+            cbr.proof_image,
+            cbr.audit_status,
+            CASE cbr.audit_status
+                WHEN 0 THEN '待审核'
+                WHEN 1 THEN '审核通过'
+                WHEN 2 THEN '审核拒绝'
+            END AS audit_status_text,
+            cbr.audit_user_id,
+            au.username AS audit_username,
+            cbr.audit_time,
+            cbr.audit_remark,
+            cbr.create_time
+        FROM carbon_behavior_record cbr
+        LEFT JOIN user u ON cbr.user_id = u.id
+        LEFT JOIN user au ON cbr.audit_user_id = au.id
+        WHERE cbr.id = #{id}
+    </select>
+    
+    <select id="selectAuditPage" resultMap="BehaviorRecordVOMap">
+        SELECT 
+            cbr.id,
+            cbr.user_id,
+            u.username,
+            u.nickname,
+            cbr.behavior_type,
+            cbr.behavior_name,
+            cbr.behavior_value,
+            cbr.carbon_reduction,
+            cbr.points,
+            cbr.description,
+            cbr.proof_image,
+            cbr.audit_status,
+            CASE cbr.audit_status
+                WHEN 0 THEN '待审核'
+                WHEN 1 THEN '审核通过'
+                WHEN 2 THEN '审核拒绝'
+            END AS audit_status_text,
+            cbr.create_time
+        FROM carbon_behavior_record cbr
+        LEFT JOIN user u ON cbr.user_id = u.id
+        WHERE cbr.audit_status = 0
+        <if test="userId != null">
+            AND cbr.user_id = #{userId}
+        </if>
+        <if test="behaviorType != null and behaviorType != ''">
+            AND cbr.behavior_type = #{behaviorType}
+        </if>
+        <if test="startTime != null">
+            AND cbr.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND cbr.create_time &lt;= #{endTime}
+        </if>
+        ORDER BY cbr.create_time ASC
+    </select>
+    
+    <select id="selectStatistics" resultType="com.carbon.dto.BehaviorStatisticsVO$BehaviorTypeStatistics">
+        SELECT 
+            cbr.behavior_type AS behaviorType,
+            cbr.behavior_name AS behaviorName,
+            COUNT(*) AS count,
+            SUM(cbr.carbon_reduction) AS carbonReduction,
+            SUM(cbr.points) AS points
+        FROM carbon_behavior_record cbr
+        WHERE cbr.user_id = #{userId}
+        AND cbr.audit_status = 1
+        <if test="startTime != null">
+            AND cbr.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND cbr.create_time &lt;= #{endTime}
+        </if>
+        GROUP BY cbr.behavior_type, cbr.behavior_name
+        ORDER BY count DESC
+    </select>
+    
+</mapper>
