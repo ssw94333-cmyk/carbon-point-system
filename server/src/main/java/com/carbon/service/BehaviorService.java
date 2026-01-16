@@ -22,6 +22,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+
 
 @Service
 @RequiredArgsConstructor
@@ -353,5 +355,39 @@ public class BehaviorService {
         }
         
         behaviorRuleMapper.deleteById(id);
+    }
+    
+    /**
+     * 获取全局统计数据（管理员）
+     */
+    public Map<String, Object> getAdminStatistics(String startDate, String endDate) {
+        Map<String, Object> result = new java.util.HashMap<>();
+        
+        // 1. 用户总数
+        result.put("totalUsers", userMapper.countTotalUsers());
+        
+        // 2. 活跃用户数（最近30天）
+        result.put("activeUsers", carbonBehaviorRecordMapper.countActiveUsers(30));
+        
+        // 3. 今日新增用户
+        result.put("todayNewUsers", userMapper.countTodayNewUsers());
+        
+        // 4. 本月新增用户
+        result.put("monthNewUsers", userMapper.countMonthNewUsers());
+        
+        // 5. 累计发放积分
+        result.put("totalPointsIssued", carbonBehaviorRecordMapper.sumApprovedPoints());
+        
+        // 6. 累计消费积分（暂时返回0，等积分商城功能开发后再实现）
+        result.put("totalPointsConsumed", 0);
+        
+        // 7. 累计减碳量
+        BigDecimal carbonReduction = carbonBehaviorRecordMapper.sumCarbonReduction();
+        result.put("totalCarbonReduction", carbonReduction != null ? carbonReduction.doubleValue() : 0.0);
+        
+        // 8. 待审核行为数
+        result.put("pendingBehaviors", carbonBehaviorRecordMapper.countPendingBehaviors());
+        
+        return result;
     }
 }

@@ -5,16 +5,15 @@ import com.carbon.common.Result;
 import com.carbon.dto.*;
 import com.carbon.model.BehaviorRule;
 import com.carbon.service.BehaviorService;
-import com.carbon.util.FileUploadUtil;
 import com.carbon.util.UserContext;
 import lombok.RequiredArgsConstructor;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/behavior")
@@ -155,15 +154,13 @@ public class BehaviorController {
     }
     
     /**
-     * 上传行为证明材料
+     * 获取全局统计数据（管理员）
      */
-    @PostMapping("/upload/behavior-proof")
-    public Result<String> uploadProof(@RequestParam("file") MultipartFile file) {
-        try {
-            String url = FileUploadUtil.uploadFile(file, "behavior-proof");
-            return Result.success("上传成功", url);
-        } catch (Exception e) {
-            return Result.error(e.getMessage());
-        }
+    @GetMapping("/admin/statistics")
+    public Result<Map<String, Object>> getAdminStatistics(
+            @RequestParam(required = false) String startDate,
+            @RequestParam(required = false) String endDate) {
+        Map<String, Object> statistics = behaviorService.getAdminStatistics(startDate, endDate);
+        return Result.success(statistics);
     }
 }

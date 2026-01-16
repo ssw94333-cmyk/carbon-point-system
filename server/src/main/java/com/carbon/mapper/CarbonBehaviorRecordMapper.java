@@ -8,7 +8,9 @@ import com.carbon.dto.BehaviorStatisticsVO;
 import com.carbon.model.CarbonBehaviorRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
+import org.apache.ibatis.annotations.Select;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 
@@ -33,4 +35,28 @@ public interface CarbonBehaviorRecordMapper extends BaseMapper<CarbonBehaviorRec
     List<BehaviorStatisticsVO.BehaviorTypeStatistics> selectStatistics(@Param("userId") Long userId,
                                                                         @Param("startTime") LocalDateTime startTime,
                                                                         @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 统计活跃用户数（最近N天有行为记录的用户）
+     */
+    @Select("SELECT COUNT(DISTINCT user_id) FROM carbon_behavior_record WHERE create_time >= DATE_SUB(NOW(), INTERVAL #{days} DAY)")
+    Integer countActiveUsers(@Param("days") Integer days);
+    
+    /**
+     * 统计累计发放积分（已审核通过）
+     */
+    @Select("SELECT COALESCE(SUM(points), 0) FROM carbon_behavior_record WHERE audit_status = 1")
+    Integer sumApprovedPoints();
+    
+    /**
+     * 统计累计减碳量（已审核通过）
+     */
+    @Select("SELECT COALESCE(SUM(carbon_reduction), 0) FROM carbon_behavior_record WHERE audit_status = 1")
+    BigDecimal sumCarbonReduction();
+    
+    /**
+     * 统计待审核行为数
+     */
+    @Select("SELECT COUNT(*) FROM carbon_behavior_record WHERE audit_status = 0")
+    Integer countPendingBehaviors();
 }

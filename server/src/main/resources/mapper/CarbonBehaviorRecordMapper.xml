@@ -145,8 +145,10 @@
             SUM(cbr.carbon_reduction) AS carbonReduction,
             SUM(cbr.points) AS points
         FROM carbon_behavior_record cbr
-        WHERE cbr.user_id = #{userId}
-        AND cbr.audit_status = 1
+        WHERE cbr.audit_status = 1
+        <if test="userId != null">
+            AND cbr.user_id = #{userId}
+        </if>
         <if test="startTime != null">
             AND cbr.create_time &gt;= #{startTime}
         </if>
