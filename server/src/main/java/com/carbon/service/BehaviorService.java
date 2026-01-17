@@ -13,6 +13,7 @@ import com.carbon.model.CarbonBehaviorRecord;
 import com.carbon.model.PointsChangeRecord;
 import com.carbon.model.User;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +28,7 @@ import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class BehaviorService {
     
     private final BehaviorRuleMapper behaviorRuleMapper;
@@ -60,14 +62,20 @@ public class BehaviorService {
      */
     @Transactional(rollbackFor = Exception.class)
     public void submitRecord(Long userId, BehaviorRecordDTO dto) {
+        log.info("=== 开始提交行为记录 ===");
+        log.info("userId: {}, behaviorType: {}, behaviorValue: {}", userId, dto.getBehaviorType(), dto.getBehaviorValue());
+        
         // 查询行为规则
         LambdaQueryWrapper<BehaviorRule> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(BehaviorRule::getBehaviorType, dto.getBehaviorType())
                 .eq(BehaviorRule::getStatus, 1);
         BehaviorRule rule = behaviorRuleMapper.selectOne(wrapper);
         if (rule == null) {
+            log.error("行为规则不存在或已禁用: {}", dto.getBehaviorType());
             throw new RuntimeException("行为规则不存在或已禁用");
         }
+        
+        log.info("找到行为规则: {}", rule.getBehaviorName());
         
         // 验证行为数值
         if (rule.getMinValue() != null && dto.getBehaviorValue().compareTo(rule.getMinValue()) < 0) {
@@ -103,6 +111,8 @@ public class BehaviorService {
                 .multiply(new BigDecimal(rule.getPointsPerUnit()))
                 .intValue();
         
+        log.info("计算结果 - 减碳量: {}, 积分: {}", carbonReduction, points);
+        
         // 验证每日最大积分限制
         if (rule.getMaxPointsPerDay() != null) {
             LocalDateTime startOfDay = LocalDateTime.of(LocalDate.now(), LocalTime.MIN);
@@ -118,18 +128,26 @@ public class BehaviorService {
                     .mapToInt(CarbonBehaviorRecord::getPoints)
                     .sum();
             
+            log.info("今日已获得积分: {}, 最大限制: {}", todayPoints, rule.getMaxPointsPerDay());
+            
             if (todayPoints + points > rule.getMaxPointsPerDay()) {
                 points = rule.getMaxPointsPerDay() - todayPoints;
                 if (points <= 0) {
+                    log.error("今日该行为积分已达上限");
                     throw new RuntimeException("今日该行为积分已达上限");
                 }
+                log.info("调整后积分: {}", points);
             }
         }
         
         // 验证是否需要证明材料
-        if (rule.getNeedProof() == 1 && (dto.getProofImage() == null || dto.getProofImage().isEmpty())) {
+        log.info("needProof: {}, proofImage: {}", rule.getNeedProof(), dto.getProofImage());
+        if (rule.getNeedProof() == 1 && (dto.getProofImage() == null || dto.getProofImage().trim().isEmpty())) {
+            log.error("该行为需要上传证明材料，但未提供");
             throw new RuntimeException("该行为需要上传证明材料");
         }
+        
+        log.info("开始保存行为记录...");
         
         // 保存行为记录
         CarbonBehaviorRecord record = new CarbonBehaviorRecord();
@@ -144,6 +162,8 @@ public class BehaviorService {
         record.setAuditStatus(0);
         
         carbonBehaviorRecordMapper.insert(record);
+        log.info("行为记录保存成功，ID: {}", record.getId());
+        log.info("=== 行为记录提交完成 ===");
     }
     
     /**
@@ -152,8 +172,16 @@ public class BehaviorService {
     public IPage<BehaviorRecordVO> getRecordPage(Long userId, String behaviorType, Integer auditStatus,
                                                   LocalDateTime startTime, LocalDateTime endTime,
                                                   Integer pageNum, Integer pageSize) {
+        log.info("=== 查询行为记录列表 ===");
+        log.info("userId: {}, behaviorType: {}, auditStatus: {}, pageNum: {}, pageSize: {}", 
+                userId, behaviorType, auditStatus, pageNum, pageSize);
+        
         Page<BehaviorRecordVO> page = new Page<>(pageNum, pageSize);
-        return carbonBehaviorRecordMapper.selectRecordPage(page, userId, behaviorType, auditStatus, startTime, endTime);
+        IPage<BehaviorRecordVO> result = carbonBehaviorRecordMapper.selectRecordPage(page, userId, behaviorType, auditStatus, startTime, endTime);
+        
+        log.info("查询结果 - 总记录数: {}, 当前页记录数: {}", result.getTotal(), result.getRecords().size());
+        
+        return result;
     }
     
     /**
@@ -189,27 +217,46 @@ public class BehaviorService {
      * 获取行为统计数据
      */
     public BehaviorStatisticsVO getStatistics(Long userId, LocalDateTime startTime, LocalDateTime endTime) {
-        List<BehaviorStatisticsVO.BehaviorTypeStatistics> typeStatistics = 
-                carbonBehaviorRecordMapper.selectStatistics(userId, startTime, endTime);
+        log.info("=== 查询行为统计数据 ===");
+        log.info("userId: {}, startTime: {}, endTime: {}", userId, startTime, endTime);
         
         BehaviorStatisticsVO vo = new BehaviorStatisticsVO();
-        vo.setTypeStatistics(typeStatistics);
         
-        Integer totalRecords = typeStatistics.stream()
+        // 1. 查询各类行为统计
+        List<BehaviorStatisticsVO.BehaviorTypeStatistics> typeStats = 
+                carbonBehaviorRecordMapper.selectStatistics(userId, startTime, endTime);
+        vo.setBehaviorTypeStats(typeStats);
+        
+        // 2. 查询月度趋势
+        List<BehaviorStatisticsVO.MonthlyTrend> monthlyTrend = 
+                carbonBehaviorRecordMapper.selectMonthlyTrend(userId, startTime, endTime);
+        vo.setMonthlyTrend(monthlyTrend);
+        
+        // 3. 计算总计
+        Integer totalCount = typeStats.stream()
                 .mapToInt(BehaviorStatisticsVO.BehaviorTypeStatistics::getCount)
                 .sum();
         
-        BigDecimal totalCarbonReduction = typeStatistics.stream()
-                .map(BehaviorStatisticsVO.BehaviorTypeStatistics::getCarbonReduction)
-                .reduce(BigDecimal.ZERO, BigDecimal::add);
-        
-        Integer totalPoints = typeStatistics.stream()
-                .mapToInt(BehaviorStatisticsVO.BehaviorTypeStatistics::getPoints)
+        Double totalCarbon = typeStats.stream()
+                .mapToDouble(BehaviorStatisticsVO.BehaviorTypeStatistics::getTotalCarbon)
                 .sum();
         
-        vo.setTotalRecords(totalRecords);
-        vo.setTotalCarbonReduction(totalCarbonReduction);
+        Integer totalPoints = typeStats.stream()
+                .mapToInt(BehaviorStatisticsVO.BehaviorTypeStatistics::getTotalPoints)
+                .sum();
+        
+        vo.setTotalCount(totalCount);
+        vo.setTotalCarbon(Math.round(totalCarbon * 100.0) / 100.0);
         vo.setTotalPoints(totalPoints);
+        
+        // 4. 计算审核通过率
+        Integer totalRecords = carbonBehaviorRecordMapper.countByUserId(userId, startTime, endTime);
+        Integer passedRecords = carbonBehaviorRecordMapper.countByUserIdAndStatus(userId, 1, startTime, endTime);
+        Double passRate = totalRecords > 0 ? (passedRecords * 100.0 / totalRecords) : 0.0;
+        vo.setPassRate(Math.round(passRate * 100.0) / 100.0);
+        
+        log.info("统计结果 - 总次数: {}, 总减碳: {}, 总积分: {}, 通过率: {}%", 
+                totalCount, totalCarbon, totalPoints, passRate);
         
         return vo;
     }
@@ -358,9 +405,56 @@ public class BehaviorService {
     }
     
     /**
+     * 获取所有行为记录（管理端）
+     */
+    public Map<String, Object> getAdminRecords(String username, String behaviorType, Integer auditStatus,
+                                                LocalDateTime startTime, LocalDateTime endTime,
+                                                Integer pageNum, Integer pageSize) {
+        log.info("=== 查询管理端行为记录 ===");
+        log.info("username: {}, behaviorType: {}, auditStatus: {}, pageNum: {}, pageSize: {}", 
+                username, behaviorType, auditStatus, pageNum, pageSize);
+        
+        Map<String, Object> result = new java.util.HashMap<>();
+        
+        // 查询记录列表
+        Page<BehaviorRecordVO> page = new Page<>(pageNum, pageSize);
+        IPage<BehaviorRecordVO> recordPage = carbonBehaviorRecordMapper.selectAdminRecordPage(
+                page, username, behaviorType, auditStatus, startTime, endTime);
+        
+        // 查询统计信息
+        RecordStatistics statistics = carbonBehaviorRecordMapper.selectRecordStatistics(
+                username, behaviorType, auditStatus, startTime, endTime);
+        
+        result.put("list", recordPage.getRecords());
+        result.put("total", recordPage.getTotal());
+        result.put("statistics", statistics);
+        
+        log.info("查询结果 - 总记录数: {}, 当前页记录数: {}, 待审核: {}, 已通过: {}, 已拒绝: {}", 
+                recordPage.getTotal(), recordPage.getRecords().size(),
+                statistics.getPendingCount(), statistics.getPassedCount(), statistics.getRejectedCount());
+        
+        return result;
+    }
+    
+    /**
      * 获取全局统计数据（管理员）
      */
     public Map<String, Object> getAdminStatistics(String startDate, String endDate) {
+        log.info("=== 查询管理员统计数据 ===");
+        log.info("startDate: {}, endDate: {}", startDate, endDate);
+        
+        // 转换日期参数
+        LocalDateTime startTime = null;
+        LocalDateTime endTime = null;
+        
+        if (startDate != null && !startDate.isEmpty()) {
+            startTime = LocalDate.parse(startDate).atStartOfDay();
+        }
+        
+        if (endDate != null && !endDate.isEmpty()) {
+            endTime = LocalDate.parse(endDate).atTime(23, 59, 59);
+        }
+        
         Map<String, Object> result = new java.util.HashMap<>();
         
         // 1. 用户总数
@@ -388,6 +482,102 @@ public class BehaviorService {
         // 8. 待审核行为数
         result.put("pendingBehaviors", carbonBehaviorRecordMapper.countPendingBehaviors());
         
+        log.info("管理员统计结果 - 用户总数: {}, 活跃用户: {}, 待审核: {}", 
+                result.get("totalUsers"), result.get("activeUsers"), result.get("pendingBehaviors"));
+        
         return result;
+    }
+    
+    /**
+     * 获取管理员行为记录列表（新接口）
+     */
+    public PageResult<BehaviorRecordVO> getAdminRecordList(BehaviorRecordQueryDTO queryDTO) {
+        log.info("=== 查询管理员行为记录列表 ===");
+        log.info("username: {}, behaviorType: {}, auditStatus: {}, page: {}, pageSize: {}", 
+                queryDTO.getUsername(), queryDTO.getBehaviorType(), queryDTO.getAuditStatus(), 
+                queryDTO.getPage(), queryDTO.getPageSize());
+        
+        // 转换日期参数
+        LocalDateTime startTime = null;
+        LocalDateTime endTime = null;
+        
+        if (queryDTO.getStartTime() != null && !queryDTO.getStartTime().isEmpty()) {
+            startTime = LocalDate.parse(queryDTO.getStartTime()).atStartOfDay();
+        }
+        
+        if (queryDTO.getEndTime() != null && !queryDTO.getEndTime().isEmpty()) {
+            endTime = LocalDate.parse(queryDTO.getEndTime()).atTime(23, 59, 59);
+        }
+        
+        // 查询记录列表
+        Page<BehaviorRecordVO> page = new Page<>(queryDTO.getPage(), queryDTO.getPageSize());
+        IPage<BehaviorRecordVO> recordPage = carbonBehaviorRecordMapper.selectAdminRecordPage(
+                page, queryDTO.getUsername(), queryDTO.getBehaviorType(), 
+                queryDTO.getAuditStatus(), startTime, endTime);
+        
+        // 查询统计信息
+        RecordStatistics statistics = carbonBehaviorRecordMapper.selectRecordStatistics(
+                queryDTO.getUsername(), queryDTO.getBehaviorType(), 
+                queryDTO.getAuditStatus(), startTime, endTime);
+        
+        // 组装返回结果
+        PageResult<BehaviorRecordVO> result = new PageResult<>();
+        result.setList(recordPage.getRecords());
+        result.setTotal(recordPage.getTotal());
+        result.setStatistics(statistics);
+        
+        log.info("查询结果 - 总记录数: {}, 当前页记录数: {}, 待审核: {}, 已通过: {}, 已拒绝: {}", 
+                recordPage.getTotal(), recordPage.getRecords().size(),
+                statistics.getPendingCount(), statistics.getPassedCount(), statistics.getRejectedCount());
+        
+        return result;
+    }
+    
+    /**
+     * 获取管理员端行为统计数据（所有用户）
+     */
+    public BehaviorStatisticsVO getAdminBehaviorStatistics(LocalDateTime startTime, LocalDateTime endTime) {
+        log.info("=== 查询管理员端行为统计数据（所有用户） ===");
+        log.info("startTime: {}, endTime: {}", startTime, endTime);
+        
+        BehaviorStatisticsVO vo = new BehaviorStatisticsVO();
+        
+        // 1. 查询各类行为统计（所有用户）
+        List<BehaviorStatisticsVO.BehaviorTypeStatistics> typeStats = 
+                carbonBehaviorRecordMapper.selectAdminStatistics(startTime, endTime);
+        vo.setBehaviorTypeStats(typeStats);
+        
+        // 2. 查询月度趋势（所有用户）
+        List<BehaviorStatisticsVO.MonthlyTrend> monthlyTrend = 
+                carbonBehaviorRecordMapper.selectAdminMonthlyTrend(startTime, endTime);
+        vo.setMonthlyTrend(monthlyTrend);
+        
+        // 3. 计算总计
+        Integer totalCount = typeStats.stream()
+                .mapToInt(BehaviorStatisticsVO.BehaviorTypeStatistics::getCount)
+                .sum();
+        
+        Double totalCarbon = typeStats.stream()
+                .mapToDouble(BehaviorStatisticsVO.BehaviorTypeStatistics::getTotalCarbon)
+                .sum();
+        
+        Integer totalPoints = typeStats.stream()
+                .mapToInt(BehaviorStatisticsVO.BehaviorTypeStatistics::getTotalPoints)
+                .sum();
+        
+        vo.setTotalCount(totalCount);
+        vo.setTotalCarbon(Math.round(totalCarbon * 100.0) / 100.0);
+        vo.setTotalPoints(totalPoints);
+        
+        // 4. 计算审核通过率（所有用户）
+        Integer totalRecords = carbonBehaviorRecordMapper.countAllRecords(startTime, endTime);
+        Integer passedRecords = carbonBehaviorRecordMapper.countAllRecordsByStatus(1, startTime, endTime);
+        Double passRate = totalRecords > 0 ? (passedRecords * 100.0 / totalRecords) : 0.0;
+        vo.setPassRate(Math.round(passRate * 100.0) / 100.0);
+        
+        log.info("管理员统计结果 - 总次数: {}, 总减碳: {}, 总积分: {}, 通过率: {}%", 
+                totalCount, totalCarbon, totalPoints, passRate);
+        
+        return vo;
     }
 }

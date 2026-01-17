@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.carbon.dto.BehaviorRecordVO;
 import com.carbon.dto.BehaviorStatisticsVO;
+import com.carbon.dto.RecordStatistics;
 import com.carbon.model.CarbonBehaviorRecord;
 import org.apache.ibatis.annotations.Mapper;
 import org.apache.ibatis.annotations.Param;
@@ -32,9 +33,35 @@ public interface CarbonBehaviorRecordMapper extends BaseMapper<CarbonBehaviorRec
                                             @Param("startTime") LocalDateTime startTime,
                                             @Param("endTime") LocalDateTime endTime);
     
+    IPage<BehaviorRecordVO> selectAdminRecordPage(Page<?> page,
+                                                   @Param("username") String username,
+                                                   @Param("behaviorType") String behaviorType,
+                                                   @Param("auditStatus") Integer auditStatus,
+                                                   @Param("startTime") LocalDateTime startTime,
+                                                   @Param("endTime") LocalDateTime endTime);
+    
+    RecordStatistics selectRecordStatistics(@Param("username") String username,
+                                           @Param("behaviorType") String behaviorType,
+                                           @Param("auditStatus") Integer auditStatus,
+                                           @Param("startTime") LocalDateTime startTime,
+                                           @Param("endTime") LocalDateTime endTime);
+    
     List<BehaviorStatisticsVO.BehaviorTypeStatistics> selectStatistics(@Param("userId") Long userId,
                                                                         @Param("startTime") LocalDateTime startTime,
                                                                         @Param("endTime") LocalDateTime endTime);
+    
+    List<BehaviorStatisticsVO.MonthlyTrend> selectMonthlyTrend(@Param("userId") Long userId,
+                                                                @Param("startTime") LocalDateTime startTime,
+                                                                @Param("endTime") LocalDateTime endTime);
+    
+    Integer countByUserId(@Param("userId") Long userId,
+                          @Param("startTime") LocalDateTime startTime,
+                          @Param("endTime") LocalDateTime endTime);
+    
+    Integer countByUserIdAndStatus(@Param("userId") Long userId,
+                                    @Param("auditStatus") Integer auditStatus,
+                                    @Param("startTime") LocalDateTime startTime,
+                                    @Param("endTime") LocalDateTime endTime);
     
     /**
      * 统计活跃用户数（最近N天有行为记录的用户）
@@ -59,4 +86,29 @@ public interface CarbonBehaviorRecordMapper extends BaseMapper<CarbonBehaviorRec
      */
     @Select("SELECT COUNT(*) FROM carbon_behavior_record WHERE audit_status = 0")
     Integer countPendingBehaviors();
+    
+    /**
+     * 管理员端：查询所有用户的行为统计（不限用户）
+     */
+    List<BehaviorStatisticsVO.BehaviorTypeStatistics> selectAdminStatistics(@Param("startTime") LocalDateTime startTime,
+                                                                             @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 管理员端：查询所有用户的月度趋势（不限用户）
+     */
+    List<BehaviorStatisticsVO.MonthlyTrend> selectAdminMonthlyTrend(@Param("startTime") LocalDateTime startTime,
+                                                                     @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 管理员端：统计所有用户的总记录数
+     */
+    Integer countAllRecords(@Param("startTime") LocalDateTime startTime,
+                           @Param("endTime") LocalDateTime endTime);
+    
+    /**
+     * 管理员端：统计所有用户指定状态的记录数
+     */
+    Integer countAllRecordsByStatus(@Param("auditStatus") Integer auditStatus,
+                                    @Param("startTime") LocalDateTime startTime,
+                                    @Param("endTime") LocalDateTime endTime);
 }

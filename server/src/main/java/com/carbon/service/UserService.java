@@ -54,6 +54,15 @@ public class UserService {
         user.setPhone(dto.getPhone());
         user.setNickname(dto.getNickname() != null ? dto.getNickname() : dto.getUsername());
         user.setEmail(dto.getEmail());
+        
+        // 设置头像（如果没有上传，使用默认头像）
+        if (dto.getAvatar() != null && !dto.getAvatar().isEmpty()) {
+            user.setAvatar(dto.getAvatar());
+        } else {
+            // 使用默认头像
+            user.setAvatar("https://ui-avatars.com/api/?name=" + dto.getUsername() + "&background=random&size=200");
+        }
+        
         user.setUserType(0); // 默认普通用户
         user.setStatus(1); // 默认启用
         user.setTotalPoints(0);

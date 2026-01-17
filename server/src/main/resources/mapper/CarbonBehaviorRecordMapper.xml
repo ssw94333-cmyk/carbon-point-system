@@ -17,7 +17,7 @@
         <result column="audit_status" property="auditStatus"/>
         <result column="audit_status_text" property="auditStatusText"/>
         <result column="audit_user_id" property="auditUserId"/>
-        <result column="audit_username" property="auditUsername"/>
+        <result column="audit_user_name" property="auditUserName"/>
         <result column="audit_time" property="auditTime"/>
         <result column="audit_remark" property="auditRemark"/>
         <result column="create_time" property="createTime"/>
@@ -43,7 +43,7 @@
                 WHEN 2 THEN '审核拒绝'
             END AS audit_status_text,
             cbr.audit_user_id,
-            au.username AS audit_username,
+            au.username AS audit_user_name,
             cbr.audit_time,
             cbr.audit_remark,
             cbr.create_time
@@ -89,7 +89,7 @@
                 WHEN 2 THEN '审核拒绝'
             END AS audit_status_text,
             cbr.audit_user_id,
-            au.username AS audit_username,
+            au.username AS audit_user_name,
             cbr.audit_time,
             cbr.audit_remark,
             cbr.create_time
@@ -137,14 +137,101 @@
         ORDER BY cbr.create_time ASC
     </select>
     
+    <select id="selectAdminRecordPage" resultMap="BehaviorRecordVOMap">
+        SELECT 
+            cbr.id,
+            cbr.user_id,
+            u.username,
+            u.nickname,
+            cbr.behavior_type,
+            cbr.behavior_name,
+            cbr.behavior_value,
+            cbr.carbon_reduction,
+            cbr.points,
+            cbr.description,
+            cbr.proof_image,
+            cbr.audit_status,
+            CASE cbr.audit_status
+                WHEN 0 THEN '待审核'
+                WHEN 1 THEN '审核通过'
+                WHEN 2 THEN '审核拒绝'
+            END AS audit_status_text,
+            cbr.audit_user_id,
+            au.username AS audit_user_name,
+            cbr.audit_time,
+            cbr.audit_remark,
+            cbr.create_time
+        FROM carbon_behavior_record cbr
+        LEFT JOIN user u ON cbr.user_id = u.id
+        LEFT JOIN user au ON cbr.audit_user_id = au.id
+        WHERE 1=1
+        <if test="username != null and username != ''">
+            AND u.username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="behaviorType != null and behaviorType != ''">
+            AND cbr.behavior_type = #{behaviorType}
+        </if>
+        <if test="auditStatus != null">
+            AND cbr.audit_status = #{auditStatus}
+        </if>
+        <if test="startTime != null">
+            AND cbr.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND cbr.create_time &lt;= #{endTime}
+        </if>
+        ORDER BY cbr.create_time DESC
+    </select>
+    
+    <select id="selectRecordStatistics" resultType="com.carbon.dto.RecordStatistics">
+        SELECT 
+            COUNT(*) AS totalCount,
+            SUM(CASE WHEN cbr.audit_status = 0 THEN 1 ELSE 0 END) AS pendingCount,
+            SUM(CASE WHEN cbr.audit_status = 1 THEN 1 ELSE 0 END) AS passedCount,
+            SUM(CASE WHEN cbr.audit_status = 2 THEN 1 ELSE 0 END) AS rejectedCount
+        FROM carbon_behavior_record cbr
+        LEFT JOIN user u ON cbr.user_id = u.id
+        WHERE 1=1
+        <if test="username != null and username != ''">
+            AND u.username LIKE CONCAT('%', #{username}, '%')
+        </if>
+        <if test="behaviorType != null and behaviorType != ''">
+            AND cbr.behavior_type = #{behaviorType}
+        </if>
+        <if test="auditStatus != null">
+            AND cbr.audit_status = #{auditStatus}
+        </if>
+        <if test="startTime != null">
+            AND cbr.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND cbr.create_time &lt;= #{endTime}
+        </if>
+    </select>
+    
     <select id="selectStatistics" resultType="com.carbon.dto.BehaviorStatisticsVO$BehaviorTypeStatistics">
         SELECT 
             cbr.behavior_type AS behaviorType,
             cbr.behavior_name AS behaviorName,
+            br.unit AS unit,
             COUNT(*) AS count,
-            SUM(cbr.carbon_reduction) AS carbonReduction,
-            SUM(cbr.points) AS points
+            SUM(cbr.behavior_value) AS totalValue,
+            SUM(cbr.carbon_reduction) AS totalCarbon,
+            SUM(cbr.points) AS totalPoints,
+            ROUND(COUNT(*) * 100.0 / (
+                SELECT COUNT(*) 
+                FROM carbon_behavior_record 
+                WHERE audit_status = 1 
+                AND user_id = #{userId}
+                <if test="startTime != null">
+                    AND create_time &gt;= #{startTime}
+                </if>
+                <if test="endTime != null">
+                    AND create_time &lt;= #{endTime}
+                </if>
+            ), 2) AS percentage
         FROM carbon_behavior_record cbr
+        LEFT JOIN behavior_rule br ON cbr.behavior_type = br.behavior_type
         WHERE cbr.audit_status = 1
         <if test="userId != null">
             AND cbr.user_id = #{userId}
@@ -155,8 +242,132 @@
         <if test="endTime != null">
             AND cbr.create_time &lt;= #{endTime}
         </if>
-        GROUP BY cbr.behavior_type, cbr.behavior_name
+        GROUP BY cbr.behavior_type, cbr.behavior_name, br.unit
         ORDER BY count DESC
+    </select>
+    
+    <select id="selectMonthlyTrend" resultType="com.carbon.dto.BehaviorStatisticsVO$MonthlyTrend">
+        SELECT 
+            DATE_FORMAT(create_time, '%Y-%m') AS month,
+            COUNT(*) AS count,
+            SUM(carbon_reduction) AS carbon,
+            SUM(points) AS points
+        FROM carbon_behavior_record
+        WHERE audit_status = 1
+        <if test="userId != null">
+            AND user_id = #{userId}
+        </if>
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY month DESC
+        LIMIT 12
+    </select>
+    
+    <select id="countByUserId" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM carbon_behavior_record
+        WHERE user_id = #{userId}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+    </select>
+    
+    <select id="countByUserIdAndStatus" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM carbon_behavior_record
+        WHERE user_id = #{userId}
+        AND audit_status = #{auditStatus}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+    </select>
+    
+    <!-- 管理员端统计查询 - 查询所有用户的数据 -->
+    <select id="selectAdminStatistics" resultType="com.carbon.dto.BehaviorStatisticsVO$BehaviorTypeStatistics">
+        SELECT 
+            cbr.behavior_type AS behaviorType,
+            cbr.behavior_name AS behaviorName,
+            br.unit AS unit,
+            COUNT(*) AS count,
+            SUM(cbr.behavior_value) AS totalValue,
+            SUM(cbr.carbon_reduction) AS totalCarbon,
+            SUM(cbr.points) AS totalPoints,
+            ROUND(COUNT(*) * 100.0 / (
+                SELECT COUNT(*) 
+                FROM carbon_behavior_record 
+                WHERE audit_status = 1
+                <if test="startTime != null">
+                    AND create_time &gt;= #{startTime}
+                </if>
+                <if test="endTime != null">
+                    AND create_time &lt;= #{endTime}
+                </if>
+            ), 2) AS percentage
+        FROM carbon_behavior_record cbr
+        LEFT JOIN behavior_rule br ON cbr.behavior_type = br.behavior_type
+        WHERE cbr.audit_status = 1
+        <if test="startTime != null">
+            AND cbr.create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND cbr.create_time &lt;= #{endTime}
+        </if>
+        GROUP BY cbr.behavior_type, cbr.behavior_name, br.unit
+        ORDER BY count DESC
+    </select>
+    
+    <select id="selectAdminMonthlyTrend" resultType="com.carbon.dto.BehaviorStatisticsVO$MonthlyTrend">
+        SELECT 
+            DATE_FORMAT(create_time, '%Y-%m') AS month,
+            COUNT(*) AS count,
+            SUM(carbon_reduction) AS carbon,
+            SUM(points) AS points
+        FROM carbon_behavior_record
+        WHERE audit_status = 1
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+        GROUP BY DATE_FORMAT(create_time, '%Y-%m')
+        ORDER BY month DESC
+        LIMIT 12
+    </select>
+    
+    <select id="countAllRecords" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM carbon_behavior_record
+        WHERE 1=1
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
+    </select>
+    
+    <select id="countAllRecordsByStatus" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM carbon_behavior_record
+        WHERE audit_status = #{auditStatus}
+        <if test="startTime != null">
+            AND create_time &gt;= #{startTime}
+        </if>
+        <if test="endTime != null">
+            AND create_time &lt;= #{endTime}
+        </if>
     </select>
     
 </mapper>

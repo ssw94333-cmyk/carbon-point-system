@@ -28,15 +28,17 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/api/**")
                 .excludePathPatterns(
                         "/api/user/register",
-                        "/api/user/login"
+                        "/api/user/login",
+                        "/api/upload/avatar"  // 注册时上传头像不需要登录
                 );
         
         // 管理员权限拦截器 - 只拦截特定的管理员接口
         registry.addInterceptor(adminInterceptor)
                 .addPathPatterns(
-                        "/api/user/list",              // 用户列表
+                        "/api/user/list",              // 用户列表（旧接口，保留兼容）
                         "/api/behavior/audit/**",      // 行为审核
-                        "/api/behavior/admin/**"       // 管理员统计等功能
+                        "/api/behavior/admin/**",      // 管理员统计等功能
+                        "/api/admin/**"                // 所有管理员接口
                 );
         
         // 规则管理权限拦截器 - GET 请求放行，POST/PUT/DELETE 需要管理员权限

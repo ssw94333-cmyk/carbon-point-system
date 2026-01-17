@@ -11,6 +11,7 @@ import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -91,10 +92,23 @@ public class BehaviorController {
      */
     @GetMapping("/statistics")
     public Result<BehaviorStatisticsVO> getStatistics(
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime startTime,
-            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd HH:mm:ss") LocalDateTime endTime) {
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") String startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") String endTime) {
         Long userId = UserContext.getUserId();
-        BehaviorStatisticsVO statistics = behaviorService.getStatistics(userId, startTime, endTime);
+        
+        // 将日期字符串转换为LocalDateTime
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+        
+        if (startTime != null && !startTime.isEmpty()) {
+            startDateTime = LocalDate.parse(startTime).atStartOfDay();
+        }
+        
+        if (endTime != null && !endTime.isEmpty()) {
+            endDateTime = LocalDate.parse(endTime).atTime(23, 59, 59);
+        }
+        
+        BehaviorStatisticsVO statistics = behaviorService.getStatistics(userId, startDateTime, endDateTime);
         return Result.success(statistics);
     }
     
@@ -161,6 +175,30 @@ public class BehaviorController {
             @RequestParam(required = false) String startDate,
             @RequestParam(required = false) String endDate) {
         Map<String, Object> statistics = behaviorService.getAdminStatistics(startDate, endDate);
+        return Result.success(statistics);
+    }
+    
+    /**
+     * 获取管理员端行为统计数据（所有用户）
+     */
+    @GetMapping("/admin/behavior-statistics")
+    public Result<BehaviorStatisticsVO> getAdminBehaviorStatistics(
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") String startTime,
+            @RequestParam(required = false) @DateTimeFormat(pattern = "yyyy-MM-dd") String endTime) {
+        
+        // 将日期字符串转换为LocalDateTime
+        LocalDateTime startDateTime = null;
+        LocalDateTime endDateTime = null;
+        
+        if (startTime != null && !startTime.isEmpty()) {
+            startDateTime = LocalDate.parse(startTime).atStartOfDay();
+        }
+        
+        if (endTime != null && !endTime.isEmpty()) {
+            endDateTime = LocalDate.parse(endTime).atTime(23, 59, 59);
+        }
+        
+        BehaviorStatisticsVO statistics = behaviorService.getAdminBehaviorStatistics(startDateTime, endDateTime);
         return Result.success(statistics);
     }
 }

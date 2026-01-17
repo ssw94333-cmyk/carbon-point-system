@@ -21,7 +21,7 @@ public class BehaviorRecordVO {
     private Integer auditStatus;
     private String auditStatusText;
     private Long auditUserId;
-    private String auditUsername;
+    private String auditUserName;
     private LocalDateTime auditTime;
     private String auditRemark;
     private LocalDateTime createTime;

@@ -2,22 +2,34 @@ package com.carbon.dto;
 
 import lombok.Data;
 
-import java.math.BigDecimal;
 import java.util.List;
 
 @Data
 public class BehaviorStatisticsVO {
-    private Integer totalRecords;
-    private BigDecimal totalCarbonReduction;
+    private Integer totalCount;
+    private Double totalCarbon;
     private Integer totalPoints;
-    private List<BehaviorTypeStatistics> typeStatistics;
+    private Double passRate;
+    private List<BehaviorTypeStatistics> behaviorTypeStats;
+    private List<MonthlyTrend> monthlyTrend;
     
     @Data
     public static class BehaviorTypeStatistics {
-        private String behaviorType;
         private String behaviorName;
+        private String behaviorType;
+        private String unit;
         private Integer count;
-        private BigDecimal carbonReduction;
+        private Double totalValue;
+        private Double totalCarbon;
+        private Integer totalPoints;
+        private Double percentage;
+    }
+    
+    @Data
+    public static class MonthlyTrend {
+        private String month;
+        private Integer count;
+        private Double carbon;
         private Integer points;
     }
 }

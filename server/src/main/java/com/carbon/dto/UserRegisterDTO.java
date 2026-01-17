@@ -22,4 +22,6 @@ public class UserRegisterDTO {
     private String nickname;
     
     private String email;
+    
+    private String avatar;
 }
