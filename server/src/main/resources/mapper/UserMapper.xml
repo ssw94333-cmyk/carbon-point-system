@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carbon.mapper.UserMapper">
+    
+    <resultMap id="UserVOMap" type="com.carbon.dto.UserVO">
+        <id column="id" property="id"/>
+        <result column="username" property="username"/>
+        <result column="nickname" property="nickname"/>
+        <result column="phone" property="phone"/>
+        <result column="email" property="email"/>
+        <result column="avatar" property="avatar"/>
+        <result column="user_type" property="userType"/>
+        <result column="status" property="status"/>
+        <result column="current_points" property="currentPoints"/>
+        <result column="total_points" property="totalPoints"/>
+        <result column="total_carbon_reduction" property="totalCarbonReduction"/>
+        <result column="create_time" property="createTime"/>
+    </resultMap>
+    
+    <!-- 查询用户列表 -->
+    <select id="selectUserList" resultMap="UserVOMap">
+        SELECT 
+            id,
+            username,
+            nickname,
+            phone,
+            email,
+            avatar,
+            user_type,
+            status,
+            current_points,
+            total_points,
+            total_carbon_reduction,
+            create_time
+        FROM user
+        WHERE 1=1
+        <if test="query.username != null and query.username != ''">
+            AND username LIKE CONCAT('%', #{query.username}, '%')
+        </if>
+        <if test="query.phone != null and query.phone != ''">
+            AND phone LIKE CONCAT('%', #{query.phone}, '%')
+        </if>
+        <if test="query.userType != null">
+            AND user_type = #{query.userType}
+        </if>
+        <if test="query.status != null">
+            AND status = #{query.status}
+        </if>
+        ORDER BY create_time DESC
+        LIMIT #{offset}, #{query.pageSize}
+    </select>
+    
+    <!-- 统计用户数量 -->
+    <select id="countUsers" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM user
+        WHERE 1=1
+        <if test="query.username != null and query.username != ''">
+            AND username LIKE CONCAT('%', #{query.username}, '%')
+        </if>
+        <if test="query.phone != null and query.phone != ''">
+            AND phone LIKE CONCAT('%', #{query.phone}, '%')
+        </if>
+        <if test="query.userType != null">
+            AND user_type = #{query.userType}
+        </if>
+        <if test="query.status != null">
+            AND status = #{query.status}
+        </if>
+    </select>
+    
+    <!-- 根据ID查询用户详情 -->
+    <select id="selectUserById" resultMap="UserVOMap">
+        SELECT 
+            id,
+            username,
+            nickname,
+            phone,
+            email,
+            avatar,
+            user_type,
+            status,
+            current_points,
+            total_points,
+            total_carbon_reduction,
+            create_time
+        FROM user
+        WHERE id = #{id}
+    </select>
+    
+    <!-- 根据邮箱查询用户 -->
+    <select id="selectByEmail" resultMap="UserVOMap">
+        SELECT 
+            id,
+            username,
+            nickname,
+            phone,
+            email,
+            avatar,
+            user_type,
+            status,
+            current_points,
+            total_points,
+            total_carbon_reduction,
+            create_time
+        FROM user
+        WHERE email = #{email}
+    </select>
+    
+    <!-- 更新用户信息 -->
+    <update id="updateUserInfo">
+        UPDATE user
+        <set>
+            <if test="nickname != null and nickname != ''">
+                nickname = #{nickname},
+            </if>
+            <if test="email != null and email != ''">
+                email = #{email},
+            </if>
+            update_time = NOW()
+        </set>
+        WHERE id = #{id}
+    </update>
+    
+</mapper>
