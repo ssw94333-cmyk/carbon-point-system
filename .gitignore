@@ -1,6 +1,5 @@
 # 敏感配置文件
-server/src/main/resources/application-dev.yml
-application-dev.yml
+**/application-dev.yml
 
 # IDE
 .idea/
