@@ -1,0 +1,86 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carbon.mapper.ProductMapper">
+    
+    <!-- 查询商品列表 -->
+    <select id="selectProductList" resultType="com.carbon.dto.ProductVO">
+        SELECT
+            id,
+            name,
+            category,
+            description,
+            image,
+            points_required AS pointsRequired,
+            stock,
+            total_stock AS totalStock,
+            exchange_limit AS exchangeLimit,
+            status,
+            sort_order AS sortOrder,
+            create_time AS createTime,
+            update_time AS updateTime
+        FROM product
+        <where>
+            <if test="query.status != null">
+                AND status = #{query.status}
+            </if>
+            <if test="query.category != null and query.category != ''">
+                AND category = #{query.category}
+            </if>
+            <if test="query.minPoints != null">
+                AND points_required &gt;= #{query.minPoints}
+            </if>
+            <if test="query.maxPoints != null">
+                AND points_required &lt;= #{query.maxPoints}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (name LIKE CONCAT('%', #{query.keyword}, '%') OR description LIKE CONCAT('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+        ORDER BY sort_order ASC, create_time DESC
+        LIMIT #{offset}, #{size}
+    </select>
+    
+    <!-- 统计商品数量 -->
+    <select id="countProducts" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM product
+        <where>
+            <if test="query.status != null">
+                AND status = #{query.status}
+            </if>
+            <if test="query.category != null and query.category != ''">
+                AND category = #{query.category}
+            </if>
+            <if test="query.minPoints != null">
+                AND points_required &gt;= #{query.minPoints}
+            </if>
+            <if test="query.maxPoints != null">
+                AND points_required &lt;= #{query.maxPoints}
+            </if>
+            <if test="query.keyword != null and query.keyword != ''">
+                AND (name LIKE CONCAT('%', #{query.keyword}, '%') OR description LIKE CONCAT('%', #{query.keyword}, '%'))
+            </if>
+        </where>
+    </select>
+    
+    <!-- 根据ID查询商品详情 -->
+    <select id="selectProductById" resultType="com.carbon.dto.ProductVO">
+        SELECT
+            id,
+            name,
+            category,
+            description,
+            image,
+            points_required AS pointsRequired,
+            stock,
+            total_stock AS totalStock,
+            exchange_limit AS exchangeLimit,
+            status,
+            sort_order AS sortOrder,
+            create_time AS createTime,
+            update_time AS updateTime
+        FROM product
+        WHERE id = #{id}
+    </select>
+    
+</mapper>

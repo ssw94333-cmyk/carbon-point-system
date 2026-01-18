@@ -1,0 +1,33 @@
+# 生产环境配置模板
+# 使用时请复制为 application-prod.yml 并修改相应配置
+
+spring:
+  datasource:
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://your-production-host:3306/carbon-point-system?useUnicode=true&characterEncoding=utf8&useSSL=true&serverTimezone=Asia/Shanghai
+    username: your-db-username
+    password: your-db-password
+
+server:
+  port: 8080
+
+mybatis-plus:
+  configuration:
+    # 生产环境关闭SQL日志
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+jwt:
+  # 生产环境请使用更复杂的密钥
+  secret: your-production-secret-key-change-this
+  # Token过期时间（毫秒），默认24小时
+  expiration: 86400000
+
+# 阿里云OSS配置
+aliyun:
+  oss:
+    enabled: true
+    endpoint: https://oss-cn-beijing.aliyuncs.com
+    access-key-id: your-access-key-id
+    access-key-secret: your-access-key-secret
+    bucket-name: your-bucket-name
+    prefix: carbon-system

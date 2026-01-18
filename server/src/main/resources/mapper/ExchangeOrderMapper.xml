@@ -1,0 +1,98 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.carbon.mapper.ExchangeOrderMapper">
+    
+    <!-- 查询订单列表 -->
+    <select id="selectOrderList" resultType="com.carbon.dto.OrderVO">
+        SELECT
+            eo.id,
+            eo.order_no AS orderNo,
+            eo.user_id AS userId,
+            u.username,
+            eo.product_id AS productId,
+            eo.product_name AS productName,
+            eo.quantity,
+            eo.points_required AS pointsRequired,
+            eo.total_points AS totalPoints,
+            eo.order_status AS orderStatus,
+            eo.receiver_name AS receiverName,
+            eo.receiver_phone AS receiverPhone,
+            eo.receiver_address AS receiverAddress,
+            eo.express_company AS expressCompany,
+            eo.express_no AS expressNo,
+            eo.remark,
+            eo.create_time AS createTime,
+            eo.update_time AS updateTime
+        FROM exchange_order eo
+        LEFT JOIN user u ON eo.user_id = u.id
+        <where>
+            <if test="query.userId != null">
+                AND eo.user_id = #{query.userId}
+            </if>
+            <if test="query.orderStatus != null">
+                AND eo.order_status = #{query.orderStatus}
+            </if>
+            <if test="query.orderNo != null and query.orderNo != ''">
+                AND eo.order_no LIKE CONCAT('%', #{query.orderNo}, '%')
+            </if>
+            <if test="query.startTime != null and query.startTime != ''">
+                AND eo.create_time &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null and query.endTime != ''">
+                AND eo.create_time &lt;= #{query.endTime}
+            </if>
+        </where>
+        ORDER BY eo.create_time DESC
+        LIMIT #{offset}, #{size}
+    </select>
+    
+    <!-- 统计订单数量 -->
+    <select id="countOrders" resultType="java.lang.Integer">
+        SELECT COUNT(*)
+        FROM exchange_order eo
+        <where>
+            <if test="query.userId != null">
+                AND eo.user_id = #{query.userId}
+            </if>
+            <if test="query.orderStatus != null">
+                AND eo.order_status = #{query.orderStatus}
+            </if>
+            <if test="query.orderNo != null and query.orderNo != ''">
+                AND eo.order_no LIKE CONCAT('%', #{query.orderNo}, '%')
+            </if>
+            <if test="query.startTime != null and query.startTime != ''">
+                AND eo.create_time &gt;= #{query.startTime}
+            </if>
+            <if test="query.endTime != null and query.endTime != ''">
+                AND eo.create_time &lt;= #{query.endTime}
+            </if>
+        </where>
+    </select>
+    
+    <!-- 根据ID查询订单详情 -->
+    <select id="selectOrderById" resultType="com.carbon.dto.OrderVO">
+        SELECT
+            eo.id,
+            eo.order_no AS orderNo,
+            eo.user_id AS userId,
+            u.username,
+            eo.product_id AS productId,
+            eo.product_name AS productName,
+            eo.quantity,
+            eo.points_required AS pointsRequired,
+            eo.total_points AS totalPoints,
+            eo.order_status AS orderStatus,
+            eo.receiver_name AS receiverName,
+            eo.receiver_phone AS receiverPhone,
+            eo.receiver_address AS receiverAddress,
+            eo.express_company AS expressCompany,
+            eo.express_no AS expressNo,
+            eo.remark,
+            eo.create_time AS createTime,
+            eo.update_time AS updateTime
+        FROM exchange_order eo
+        LEFT JOIN user u ON eo.user_id = u.id
+        WHERE eo.id = #{id}
+    </select>
+    
+</mapper>

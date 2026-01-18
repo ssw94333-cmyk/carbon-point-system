@@ -3,6 +3,7 @@ package com.carbon.service;
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.carbon.dto.PageResult;
 import com.carbon.mapper.PointsChangeRecordMapper;
 import com.carbon.model.PointsChangeRecord;
 import com.carbon.util.UserContext;
@@ -18,7 +19,7 @@ public class PointsService {
     /**
      * 获取积分变动历史记录
      */
-    public IPage<PointsChangeRecord> getPointsHistory(Integer page, Integer size, Integer changeType, String startTime, String endTime) {
+    public PageResult<PointsChangeRecord> getPointsHistory(Integer page, Integer size, Integer changeType, String startTime, String endTime) {
         Long userId = UserContext.getUserId();
         
         Page<PointsChangeRecord> pageParam = new Page<>(page, size);
@@ -39,6 +40,8 @@ public class PointsService {
         
         wrapper.orderByDesc(PointsChangeRecord::getCreateTime);
         
-        return pointsChangeRecordMapper.selectPage(pageParam, wrapper);
+        IPage<PointsChangeRecord> result = pointsChangeRecordMapper.selectPage(pageParam, wrapper);
+        
+        return new PageResult<>(result.getRecords(), result.getTotal(), page, size);
     }
 }

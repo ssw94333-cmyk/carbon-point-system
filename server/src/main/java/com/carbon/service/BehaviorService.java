@@ -522,8 +522,10 @@ public class BehaviorService {
         
         // 组装返回结果
         PageResult<BehaviorRecordVO> result = new PageResult<>();
-        result.setList(recordPage.getRecords());
+        result.setRecords(recordPage.getRecords());
         result.setTotal(recordPage.getTotal());
+        result.setPage((int) recordPage.getCurrent());
+        result.setSize((int) recordPage.getSize());
         result.setStatistics(statistics);
         
         log.info("查询结果 - 总记录数: {}, 当前页记录数: {}, 待审核: {}, 已通过: {}, 已拒绝: {}", 
